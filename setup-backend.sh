@@ -69,18 +69,24 @@ CORS_ORIGIN="http://${ALB_INPUT}"
 echo "  ✓ CORS_ORIGIN: $CORS_ORIGIN"
 echo ""
 
-# S3 Bucket — opcional
-echo "Bucket S3 com os arquivos da aplicação (Enter para pular — upload manual):"
-echo "  Exemplo: techstock-060440628950/backend"
-echo "  Sem s3:// — só o bucket/prefixo"
-read -p "  → " S3_INPUT
-S3_INPUT="${S3_INPUT// /}"
-S3_INPUT="${S3_INPUT#s3://}"
-if [[ -n "$S3_INPUT" ]]; then
-  S3_BUCKET="s3://${S3_INPUT}"
-  echo "  ✓ S3_BUCKET: $S3_BUCKET"
+# GitHub — URL base do repositório
+echo "URL base do repositório GitHub (raw):"
+echo "  Exemplo: https://raw.githubusercontent.com/SEU_USER/SEU_REPO/main"
+echo "  Como obter: GitHub → arquivo → botão Raw → copie a URL até /main"
+read -p "  → " GITHUB_RAW
+GITHUB_RAW="${GITHUB_RAW// /}"
+GITHUB_RAW="${GITHUB_RAW%/}"
+if [[ -n "$GITHUB_RAW" ]]; then
+  echo "  ✓ GITHUB_RAW: $GITHUB_RAW"
+  echo "  Subdiretório do backend no repo (Enter se raiz):"
+  echo "  Exemplo: backend  ou  src/backend"
+  read -p "  → " GITHUB_SUBDIR
+  GITHUB_SUBDIR="${GITHUB_SUBDIR// /}"
+  GITHUB_SUBDIR="${GITHUB_SUBDIR%/}"
+  [[ -n "$GITHUB_SUBDIR" ]] && GITHUB_BASE="${GITHUB_RAW}/${GITHUB_SUBDIR}" || GITHUB_BASE="$GITHUB_RAW"
+  echo "  ✓ URL arquivos: $GITHUB_BASE"
 else
-  S3_BUCKET=""
+  GITHUB_BASE=""
   echo "  ⚠ Pulado — faça upload manual dos arquivos"
 fi
 echo ""
@@ -93,7 +99,8 @@ echo "   DB_NAME     = $DB_NAME"
 echo "   DB_USER     = $DB_USER"
 echo "   DB_SSL      = $DB_SSL"
 echo "   CORS_ORIGIN = $CORS_ORIGIN"
-echo "   S3_BUCKET   = ${S3_BUCKET:-'(upload manual)'}"
+echo "   GITHUB_BASE = ${GITHUB_BASE:-'(upload manual)'}"
+echo "--------------------------------------------"
 echo "--------------------------------------------"
 echo ""
 read -p "Confirma e inicia a instalação? (s/N): " CONFIRM
@@ -124,20 +131,36 @@ mkdir -p $APP_DIR/public
 echo ""
 echo "--- [3/8] Copiando arquivos da aplicação ---"
 
-if [[ -n "$S3_BUCKET" ]]; then
-  echo "Copiando do S3: $S3_BUCKET"
-  aws s3 sync $S3_BUCKET $APP_DIR/ \
-    && echo "Sincronização S3: OK" \
-    || echo "AVISO: erro no sync S3 — verifique permissões do LabRole"
+if [[ -n "$GITHUB_BASE" ]]; then
+  echo "Baixando arquivos do GitHub: $GITHUB_BASE"
+  mkdir -p $APP_DIR
+  for f in server.js package.json schema.sql; do
+    echo "  baixando $f..."
+    if wget -q -O $APP_DIR/$f "$GITHUB_BASE/$f"; then
+      echo "  ✓ $f"
+    else
+      echo "  ✗ $f — não encontrado em $GITHUB_BASE/$f"
+    fi
+  done
+  # Opcionais
+  for f in package-lock.json; do
+    wget -q -O $APP_DIR/$f "$GITHUB_BASE/$f" 2>/dev/null && echo "  ✓ $f" || true
+  done
+  echo ""
+  echo "Arquivos baixados:"
+  ls -la $APP_DIR/ 2>/dev/null
 else
   echo ""
   echo "Copie os arquivos manualmente para $APP_DIR/:"
-  echo "  Opção A — scp:"
+  echo "  GitHub (raw):"
+  echo "    BASE=https://raw.githubusercontent.com/USER/REPO/main"
+  echo "    for f in server.js package.json schema.sql; do"
+  echo "      wget -O $APP_DIR/\$f \$BASE/\$f"
+  echo "    done"
+  echo ""
+  echo "  scp:"
   echo "    scp -i vockey.pem server.js package.json schema.sql ec2-user@IP:/tmp/"
   echo "    sudo cp /tmp/{server.js,package.json,schema.sql} $APP_DIR/"
-  echo ""
-  echo "  Opção B — wget (se tiver URL pública):"
-  echo "    wget -P $APP_DIR/ http://URL/server.js"
   echo ""
   echo "Pressione Enter após copiar os arquivos..."
   read -p ""

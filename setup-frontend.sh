@@ -41,18 +41,24 @@ echo "  ✓ ALB_DNS: $ALB_DNS"
 echo "  ✓ API_URL: http://$ALB_DNS"
 echo ""
 
-# S3 Bucket — opcional
-echo "Bucket S3 com os arquivos do frontend (Enter para pular — upload manual):"
-echo "  Exemplo: techstock-060440628950/frontend"
-echo "  Sem s3:// — só o bucket/prefixo"
-read -p "  → " S3_INPUT
-S3_INPUT="${S3_INPUT// /}"
-S3_INPUT="${S3_INPUT#s3://}"
-if [[ -n "$S3_INPUT" ]]; then
-  S3_BUCKET="s3://${S3_INPUT}"
-  echo "  ✓ S3_BUCKET: $S3_BUCKET"
+# GitHub — URL base do repositório
+echo "URL base do repositório GitHub (raw):"
+echo "  Exemplo: https://raw.githubusercontent.com/SEU_USER/SEU_REPO/main"
+echo "  Como obter: GitHub → arquivo → botão Raw → copie a URL até /main"
+read -p "  → " GITHUB_RAW
+GITHUB_RAW="${GITHUB_RAW// /}"
+GITHUB_RAW="${GITHUB_RAW%/}"
+if [[ -n "$GITHUB_RAW" ]]; then
+  echo "  ✓ GITHUB_RAW: $GITHUB_RAW"
+  echo "  Subdiretório do frontend no repo (Enter se raiz):"
+  echo "  Exemplo: frontend  ou  src/frontend"
+  read -p "  → " GITHUB_SUBDIR
+  GITHUB_SUBDIR="${GITHUB_SUBDIR// /}"
+  GITHUB_SUBDIR="${GITHUB_SUBDIR%/}"
+  [[ -n "$GITHUB_SUBDIR" ]] && GITHUB_BASE="${GITHUB_RAW}/${GITHUB_SUBDIR}" || GITHUB_BASE="$GITHUB_RAW"
+  echo "  ✓ URL arquivos: $GITHUB_BASE"
 else
-  S3_BUCKET=""
+  GITHUB_BASE=""
   echo "  ⚠ Pulado — faça upload manual dos arquivos"
 fi
 echo ""
@@ -62,7 +68,9 @@ echo "--------------------------------------------"
 echo " Resumo da configuração:"
 echo "   ALB_DNS   = $ALB_DNS"
 echo "   API_URL   = http://$ALB_DNS"
-echo "   S3_BUCKET = ${S3_BUCKET:-'(upload manual)'}"
+echo "   GITHUB    = ${GITHUB_BASE:-'(upload manual)'}"
+echo "   WEBROOT   = $WEBROOT"
+echo "--------------------------------------------"
 echo "   WEBROOT   = $WEBROOT"
 echo "--------------------------------------------"
 echo ""
@@ -124,25 +132,35 @@ chmod -R 755 $WEBROOT
 echo ""
 echo "--- [3/6] Copiando arquivos do frontend ---"
 
-if [[ -n "$S3_BUCKET" ]]; then
-  echo "Copiando do S3: $S3_BUCKET"
-  aws s3 sync $S3_BUCKET $WEBROOT/ \
-    && echo "Sincronização S3: OK" \
-    || echo "AVISO: erro no sync S3 — verifique permissões do LabRole"
+if [[ -n "$GITHUB_BASE" ]]; then
+  echo "Baixando arquivos do GitHub: $GITHUB_BASE"
+  mkdir -p $WEBROOT
+  for f in index.html style.css app.js config.js; do
+    echo "  baixando $f..."
+    if wget -q -O $WEBROOT/$f "$GITHUB_BASE/$f"; then
+      echo "  ✓ $f"
+    else
+      echo "  ✗ $f — não encontrado em $GITHUB_BASE/$f"
+    fi
+  done
   chown -R nginx:nginx $WEBROOT/
   chmod -R 755 $WEBROOT/
+  echo ""
+  echo "Arquivos baixados:"
+  ls -la $WEBROOT/
 else
   echo ""
   echo "Copie os arquivos manualmente para $WEBROOT/:"
   echo ""
-  echo "  Opção A — scp da sua máquina local:"
+  echo "  GitHub (raw):"
+  echo "    BASE=https://raw.githubusercontent.com/USER/REPO/main"
+  echo "    for f in index.html style.css app.js config.js; do"
+  echo "      wget -O $WEBROOT/\$f \$BASE/\$f"
+  echo "    done"
+  echo ""
+  echo "  scp:"
   echo "    scp -i vockey.pem index.html style.css app.js config.js ec2-user@IP:/tmp/"
   echo "    sudo cp /tmp/{index.html,style.css,app.js,config.js} $WEBROOT/"
-  echo ""
-  echo "  Opção B — wget de URL pública:"
-  echo "    for f in index.html style.css app.js config.js; do"
-  echo "      wget -O $WEBROOT/\$f http://URL/\$f"
-  echo "    done"
   echo ""
   echo "Pressione Enter após copiar os arquivos..."
   read -p ""
