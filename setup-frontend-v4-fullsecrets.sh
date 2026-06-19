@@ -6,10 +6,10 @@
 # =============================================================================
 
 echo ""
-echo "============================================"
+echo "======================================================="
 echo " TechStock — Setup Frontend v4"
 echo " $(date)"
-echo "============================================"
+echo "======================================================="
 echo ""
 echo "Para começar, informe a região e o nome do secret."
 echo ""
@@ -74,20 +74,17 @@ echo ""
 # ══════════════════════════════════════════════════════════════════════════════
 # Apresenta valores e pergunta se deseja atualizar
 # ══════════════════════════════════════════════════════════════════════════════
-echo "============================================"
+echo "======================================================="
 echo " Valores atuais do secret"
-echo "============================================"
+echo "======================================================="
 echo "  ALB_DNS              = ${ALB_DNS:-'(não definido)'}"
 echo "  WEBROOT              = ${WEBROOT}"
 echo "  NODE_EXPORTER_VERSION= ${NODE_EXPORTER_VERSION}"
 echo "  GITHUB_RAW           = ${GITHUB_RAW:-'(não definido)'}"
 echo "  GITHUB_SUBDIR        = ${GITHUB_SUBDIR:-'(raiz)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 
-# ── Função de entrada com label garantido ──────────────────────────────────
-# Usa printf em vez de echo+read separados para evitar condição de corrida
-# entre stdout e stderr. Destaca o nome do campo em negrito.
 prompt_field() {
   local label="$1" current="$2"
   local BOLD=$'\033[1m' RESET=$'\033[0m'
@@ -129,9 +126,9 @@ ERRORS=0
 [[ -z "$GITHUB_RAW" ]] && echo "  ⚠ GITHUB_RAW não definido — upload manual necessário"
 [[ $ERRORS -gt 0 ]] && { echo "  ✗ Corrija e execute novamente."; exit 1; }
 
-echo "============================================"
+echo "======================================================="
 echo " Resumo final"
-echo "============================================"
+echo "======================================================="
 echo "  SECRET_NAME          = $SECRET_NAME"
 echo "  AWS_REGION           = $AWS_REGION"
 echo "  ALB_DNS              = $ALB_DNS"
@@ -139,7 +136,7 @@ echo "  API_URL              = http://$ALB_DNS"
 echo "  WEBROOT              = $WEBROOT"
 echo "  NODE_EXPORTER_VERSION= $NODE_EXPORTER_VERSION"
 echo "  GITHUB_BASE          = ${GITHUB_BASE:-'(upload manual)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 read -p "Confirma e salva no Secrets Manager? (s/N): " CONFIRM
 [[ "$CONFIRM" =~ ^[Ss]$ ]] || { echo "Cancelado."; exit 0; }
@@ -231,18 +228,19 @@ done
 
 echo ""
 echo "--- [4/5] Nginx ---"
-cat > /etc/nginx/conf.d/techstock.conf << 'NGINX'
+# Correção crucial: Injeta o WEBROOT dinâmico na configuração do bloco de servidor do Nginx
+cat > /etc/nginx/conf.d/techstock.conf << NGINX
 server {
     listen 80 default_server;
     server_name _;
-    root  /usr/share/nginx/html/techstock;
+    root  ${WEBROOT};
     index index.html;
     location = /config.js {
         add_header Cache-Control "no-store, no-cache, must-revalidate";
         add_header Pragma "no-cache"; expires -1;
     }
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
         add_header Cache-Control "no-cache";
         add_header X-Frame-Options "SAMEORIGIN";
     }
@@ -297,7 +295,7 @@ systemctl start  node_exporter amazon-cloudwatch-agent
 
 echo ""
 echo "============================================"
-echo " Verificação Final"
+echo " Verification Final"
 echo "============================================"
 echo ""
 echo "Secret Manager:"

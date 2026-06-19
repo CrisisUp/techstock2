@@ -10,10 +10,10 @@
 # ETAPA 0 — Região e nome do secret (mínimo para acessar o Secrets Manager)
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "============================================"
+echo "======================================================="
 echo " TechStock — Setup Backend v4"
 echo " $(date)"
-echo "============================================"
+echo "======================================================="
 echo ""
 echo "Para começar, informe a região e o nome do secret."
 echo "Todos os demais dados serão lidos/gravados no Secrets Manager."
@@ -105,9 +105,9 @@ echo ""
 # ══════════════════════════════════════════════════════════════════════════════
 # ETAPA 2 — Apresenta valores e pergunta se deseja atualizar
 # ══════════════════════════════════════════════════════════════════════════════
-echo "============================================"
+echo "======================================================="
 echo " Valores atuais do secret"
-echo "============================================"
+echo "======================================================="
 echo "  DB_HOST              = ${DB_HOST:-'(não definido)'}"
 echo "  DB_PORT              = ${DB_PORT}"
 echo "  DB_NAME              = ${DB_NAME}"
@@ -123,29 +123,14 @@ echo "  APP_DIR              = ${APP_DIR}"
 echo "  NODE_EXPORTER_VERSION= ${NODE_EXPORTER_VERSION}"
 echo "  GITHUB_RAW           = ${GITHUB_RAW:-'(não definido)'}"
 echo "  GITHUB_SUBDIR        = ${GITHUB_SUBDIR:-'(raiz)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 
-# Função auxiliar: prompt com valor atual como padrão
 prompt_field() {
   local label="$1"
   local current="$2"
-  local secret="$3"   # true = oculta no echo
+  local secret="$3"
   local result
-
-  # ── Por que >&2 e </dev/tty? ──────────────────────────────────────────────
-  # Esta função é chamada como: VAR=$(prompt_field ...)
-  # A sintaxe $() captura TODO o stdout da função.
-  # Se os echo de label forem para stdout, o texto do label vai para VAR
-  # em vez de aparecer no terminal — e o usuário só vê o cursor piscando.
-  # Solução:
-  #   echo ... >&2        → manda o label para stderr (aparece no terminal,
-  #                          não é capturado pelo $())
-  #   read ... </dev/tty  → garante que o read lê do terminal mesmo dentro
-  #                          de uma subshell criada pelo $()
-  # O único echo sem >&2 é o final (echo "${result:-$current}"), que é
-  # justamente o valor que queremos capturar na variável.
-  # ──────────────────────────────────────────────────────────────────────────
 
   if [[ "$secret" == "true" ]]; then
     echo "  $label (Enter para manter):" >&2
@@ -218,9 +203,9 @@ fi
 # ══════════════════════════════════════════════════════════════════════════════
 # ETAPA 4 — Confirmação final
 # ══════════════════════════════════════════════════════════════════════════════
-echo "============================================"
+echo "======================================================="
 echo " Resumo final"
-echo "============================================"
+echo "======================================================="
 echo "  SECRET_NAME          = $SECRET_NAME"
 echo "  AWS_REGION           = $AWS_REGION"
 echo "  DB_HOST              = $DB_HOST"
@@ -234,7 +219,7 @@ echo "  CORS_ORIGIN          = $CORS_ORIGIN"
 echo "  APP_DIR              = $APP_DIR"
 echo "  NODE_EXPORTER_VERSION= $NODE_EXPORTER_VERSION"
 echo "  GITHUB_BASE          = ${GITHUB_BASE:-'(upload manual)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 read -p "Confirma e salva no Secrets Manager? (s/N): " CONFIRM
 [[ "$CONFIRM" =~ ^[Ss]$ ]] || { echo "Cancelado."; exit 0; }
@@ -286,7 +271,7 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ETAPA 6 — Instalação
+# ETAPA 6 — Instalação do ambiente e dependências
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "--- [1/8] Atualizando sistema ---"
@@ -295,13 +280,13 @@ dnf install -y nodejs npm postgresql15 git wget
 echo "Node.js: $(node --version) | npm: $(npm --version)"
 
 echo ""
-echo "--- [2/8] Criando usuário e diretório ---"
+echo "--- [2/8] Criando usuário e diretórios de execução ---"
 useradd -r -m -d $APP_DIR -s /bin/bash techstock 2>/dev/null \
   && echo "Usuário techstock: criado" || echo "Usuário techstock: já existe (ok)"
 mkdir -p $APP_DIR/public
 
 echo ""
-echo "--- [3/8] Baixando arquivos do GitHub ---"
+echo "--- [3/8] Baixando arquivos de código estável do GitHub ---"
 if [[ -n "$GITHUB_BASE" ]]; then
   mkdir -p $APP_DIR
   for f in server.js package.json schema.sql; do
@@ -309,9 +294,8 @@ if [[ -n "$GITHUB_BASE" ]]; then
     wget -q -O $APP_DIR/$f "$GITHUB_BASE/$f" && echo "  ✓ $f" || echo "  ✗ $f"
   done
   wget -q -O $APP_DIR/package-lock.json "$GITHUB_BASE/package-lock.json" 2>/dev/null || true
-  ls -la $APP_DIR/
 else
-  echo "Copie os arquivos para $APP_DIR/ e pressione Enter..."
+  echo "Copie os arquivos de código para $APP_DIR/ e pressione Enter..."
   read -p ""
 fi
 
@@ -320,12 +304,15 @@ for f in server.js package.json; do
 done
 
 echo ""
-echo "--- [4/8] Instalando dependências Node.js ---"
-cd $APP_DIR && npm install --omit=dev
-echo "Pacotes instalados: $(ls node_modules | wc -l)"
+echo "--- [4/8] Instalando dependências isoladas via usuário da aplicação ---"
+cd $APP_DIR
+# Garante a propriedade temporária para que o npm consiga criar caches se necessário
+chown -R techstock:techstock $APP_DIR
+sudo -u techstock npm install --omit=dev
+echo "Pacotes instalados com sucesso: $(ls node_modules | wc -l)"
 
 echo ""
-echo "--- [5/8] Criando .env mínimo (apenas referência ao secret) ---"
+echo "--- [5/8] Criando .env mínimo de referência ao Cloud Secrets ---"
 cat > $APP_DIR/.env << ENV
 # .env — TechStock Backend
 # Apenas referência ao Secrets Manager. Variáveis sensíveis NÃO ficam aqui.
@@ -333,25 +320,27 @@ TECHSTOCK_SECRET_NAME=${SECRET_NAME}
 AWS_REGION=${AWS_REGION}
 ENV
 
+# Restrição rigorosa de privilégios de leitura de credenciais
 chown techstock:techstock $APP_DIR/.env
 chmod 640 $APP_DIR/.env
 chown -R techstock:techstock $APP_DIR
 chmod 755 $APP_DIR
-echo "  ✓ .env criado (sem dados sensíveis)"
+echo "  ✓ .env criado e segurança de acesso configurada."
 
 echo ""
-echo "--- [6/8] Inicializando schema do banco ---"
+echo "--- [6/8] Inicializando schema relacional e populando tabelas ---"
 if [[ -f $APP_DIR/schema.sql ]]; then
+  # Executa o schema higienizado com tratamento de SSL mode seguro
   PGPASSWORD="$DB_PASSWORD" psql \
     -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
     --set=sslmode=require -f $APP_DIR/schema.sql \
-    && echo "Schema: OK" || echo "AVISO: erro no schema"
+    && echo "Schema e Seeds do Banco populados: OK" || echo "AVISO: falha na execução do schema relacional"
 else
-  echo "schema.sql não encontrado — execute manualmente se necessário."
+  echo "schema.sql não localizado — execute de forma isolada."
 fi
 
 echo ""
-echo "--- [7/8] Configurando serviço systemd ---"
+echo "--- [7/8] Configurando e registrando serviço no Systemd ---"
 cat > /etc/systemd/system/techstock.service << SVC
 [Unit]
 Description=TechStock Backend API
@@ -372,18 +361,20 @@ SyslogIdentifier=techstock
 [Install]
 WantedBy=multi-user.target
 SVC
+
 systemctl daemon-reload
 systemctl enable techstock
-systemctl start techstock
+systemctl restart techstock
 sleep 4
-echo "techstock: $(systemctl is-active techstock)"
+echo "Status do serviço techstock: $(systemctl is-active techstock)"
 
 echo ""
-echo "--- [8/8] Node Exporter + CloudWatch Agent ---"
+echo "--- [8/8] Provisionamento do Node Exporter + CloudWatch Agent ---"
 wget -q "https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" -O /tmp/ne.tar.gz
 tar xzf /tmp/ne.tar.gz -C /tmp/
 cp /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/bin/ 2>/dev/null || true
 chmod +x /usr/local/bin/node_exporter
+
 cat > /etc/systemd/system/node_exporter.service << 'NE'
 [Unit]
 Description=Node Exporter
@@ -410,14 +401,15 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << CW
   }}
 }
 CW
+
 systemctl daemon-reload
 systemctl enable node_exporter amazon-cloudwatch-agent
-systemctl start  node_exporter amazon-cloudwatch-agent
+systemctl restart node_exporter amazon-cloudwatch-agent
 
 echo ""
-echo "============================================"
-echo " Verificação Final"
-echo "============================================"
+echo "======================================================="
+echo " Verificação Final do Ambiente"
+echo "======================================================="
 echo ""
 echo "Secret Manager:"
 aws secretsmanager describe-secret \
@@ -425,36 +417,37 @@ aws secretsmanager describe-secret \
   --query '{Name:Name,LastChanged:LastChangedDate}' --output table 2>/dev/null
 
 echo ""
-echo "Serviços:"
+echo "Serviços do Sistema:"
 for svc in techstock node_exporter amazon-cloudwatch-agent; do
   STATUS=$(systemctl is-active $svc 2>/dev/null)
   echo "  $([[ "$STATUS" == "active" ]] && echo ✓ || echo ✗) $svc: $STATUS"
 done
 
 echo ""
-echo "Teste da API:"
+echo "Teste de Integridade da API (Health Check):"
 sleep 2
 curl -s http://localhost:3000/api/health | python3 -m json.tool 2>/dev/null \
   || curl -s http://localhost:3000/api/health
 
 echo ""
-echo "Node Exporter:"
+echo "Métricas do Node Exporter (OS):"
 curl -s http://localhost:9100/metrics | grep "^node_load1" | head -1
 
 echo ""
-echo "============================================"
-echo " Setup CONCLUÍDO: $(date)"
-echo "============================================"
+echo "======================================================="
+echo " Setup CONCLUÍDO com sucesso: $(date)"
+echo "======================================================="
 echo ""
 MY_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null)
-echo "IP privado: $MY_IP"
-echo "Secret: $SECRET_NAME (região: $AWS_REGION)"
+echo "IP privado da instância: $MY_IP"
+echo "Secret ativo: $SECRET_NAME (região: $AWS_REGION)"
 echo ""
-echo "Para atualizar variáveis sem redeploy:"
-echo "  1. Execute novamente este script (mostrará valores atuais para edição)"
-echo "  2. Ou: Console AWS → Secrets Manager → $SECRET_NAME → Edit"
-echo "  3. sudo systemctl restart techstock"
+echo "Como gerenciar modificações sem redeploy:"
+echo "  1. Execute novamente este script (ele trará o estado atual da AWS para edição)"
+echo "  2. Console AWS → Secrets Manager → $SECRET_NAME → Edit"
+echo "  3. Executar: sudo systemctl restart techstock"
 echo ""
-echo "PENDÊNCIAS:"
-echo "  1. Adicionar EC2 ao Target Group ALB (porta $PORT)"
-echo "  2. SG do Backend: liberar $PORT e 9100 para SG do EC2 Monitoring"
+echo "PENDÊNCIAS OPERACIONAIS:"
+echo "  1. Vincular a Instância EC2 ao Target Group do Application Load Balancer na porta $PORT."
+echo "  2. Security Group do Backend: Liberar tráfego na porta $PORT (API) e 9100 (Node Exporter) apenas para o SG do Monitoramento."
+echo ""

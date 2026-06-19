@@ -1,0 +1,449 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TechStock Multi-Cloud - Infraestrutura Oficial AWS Academy / Learner Lab (us-east-1)'
+
+Parameters:
+  KeyPairName:
+    Description: 'Nome da sua Key Pair SSH existente na AWS para acessar as EC2'
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Default: 'vockey'
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+
+Resources:
+  # ════════════════════════════════════════════════════════════════════════════
+  # 1. CAMADA DE REDE CONFORME GUIA (VPC, Subnets Públicas/Privadas e NAT Gateway)
+  # ════════════════════════════════════════════════════════════════════════════
+  TechStockVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 'VPC TechStock'
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: techstock-igw
+
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      CidrBlock: '10.0.1.0/24'
+      AvailabilityZone: 'us-east-1a'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: techstock-public-a
+
+  PublicSubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      CidrBlock: '10.0.2.0/24'
+      AvailabilityZone: 'us-east-1b'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: techstock-public-b
+
+  PrivateSubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      CidrBlock: '10.0.10.0/24'
+      AvailabilityZone: 'us-east-1a'
+      Tags:
+        - Key: Name
+          Value: techstock-private-a
+
+  PrivateSubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      CidrBlock: '10.0.20.0/24'
+      AvailabilityZone: 'us-east-1b'
+      Tags:
+        - Key: Name
+          Value: techstock-private-b
+
+  NATEIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+
+  MyNatGateway:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt NATEIP.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: techstock-nat
+
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      Tags:
+        - Key: Name
+          Value: techstock-public-rt
+
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetAAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref TechStockVPC
+      Tags:
+        - Key: Name
+          Value: techstock-private-rt
+
+  PrivateRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref MyNatGateway
+
+  PrivateSubnetAAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetA   # <--- FIX: Corrigido o nome de referência lógico do recurso!
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # 2. CAMADA DE SEGURANÇA COM NOMENCLATURA DO GUIA
+  # ════════════════════════════════════════════════════════════════════════════
+  ALBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'sg-alb'
+      VpcId: !Ref TechStockVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: sg-alb
+
+  MonitoringSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'sg-monitoring'
+      VpcId: !Ref TechStockVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp: '10.0.0.0/16'
+        - IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9100
+          CidrIp: '10.0.0.0/16'
+      Tags:
+        - Key: Name
+          Value: sg-monitoring
+
+  BackendSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'sg-backend'
+      VpcId: !Ref TechStockVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref MonitoringSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9100
+          SourceSecurityGroupId: !Ref MonitoringSecurityGroup
+      Tags:
+        - Key: Name
+          Value: sg-backend
+
+  FrontendSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'sg-frontend'
+      VpcId: !Ref TechStockVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9100
+          SourceSecurityGroupId: !Ref MonitoringSecurityGroup
+      Tags:
+        - Key: Name
+          Value: sg-frontend
+
+  RDSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'sg-rds'
+      VpcId: !Ref TechStockVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BackendSecurityGroup
+      Tags:
+        - Key: Name
+          Value: sg-rds
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # 3. CAMADA DE BANCO DE DADOS (RDS PostgreSQL 15)
+  # ════════════════════════════════════════════════════════════════════════════
+  DBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: 'Subnets privadas para o RDS TechStock'
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+
+  TechStockRDS:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBName: 'techstock'
+      DBInstanceIdentifier: 'techstock-db'
+      AllocatedStorage: '20'
+      DBInstanceClass: 'db.t3.micro'
+      Engine: 'postgres'
+      EngineVersion: '15'
+      MasterUsername: 'techstock_user'
+      MasterUserPassword: 'SenhaForte123!'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      PubliclyAccessible: false
+      StorageType: 'gp2'
+      Tags:
+        - Key: Name
+          Value: techstock-rds
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # 4. COMPUTAÇÃO (EC2 Backend, Frontend e Monitoring na Subnet Privada)
+  # ════════════════════════════════════════════════════════════════════════════
+  EC2BackendInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro'
+      ImageId: !Ref LatestAmiId
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PrivateSubnetA
+      SecurityGroupIds:
+        - !Ref BackendSecurityGroup
+      IamInstanceProfile: 'LabInstanceProfile'
+      Tags:
+        - Key: Name
+          Value: techstock-backend
+
+  EC2FrontendInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro'
+      ImageId: !Ref LatestAmiId
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PrivateSubnetA
+      SecurityGroupIds:
+        - !Ref FrontendSecurityGroup
+      IamInstanceProfile: 'LabInstanceProfile'
+      Tags:
+        - Key: Name
+          Value: techstock-frontend
+
+  EC2MonitoringInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro'
+      ImageId: !Ref LatestAmiId
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref PrivateSubnetA
+      SecurityGroupIds:
+        - !Ref MonitoringSecurityGroup
+      IamInstanceProfile: 'LabInstanceProfile'
+      Tags:
+        - Key: Name
+          Value: techstock-monitoring
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # 5. ROTEAMENTO COM REGRAS E PRIORIDADES DO GUIA (ALB)
+  # ════════════════════════════════════════════════════════════════════════════
+  TechStockALB:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: 'techstock-alb'
+      Scheme: 'internet-facing'
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Type: 'application'
+
+  ALBTargetBackend:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: 'tg-backend'
+      Port: 3000
+      Protocol: 'HTTP'
+      VpcId: !Ref TechStockVPC
+      TargetType: 'instance'
+      HealthCheckPath: '/api/health'
+      Targets:
+        - Id: !Ref EC2BackendInstance
+          Port: 3000
+
+  ALBTargetFrontend:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: 'tg-frontend'
+      Port: 80
+      Protocol: 'HTTP'
+      VpcId: !Ref TechStockVPC
+      TargetType: 'instance'
+      HealthCheckPath: '/health'
+      Targets:
+        - Id: !Ref EC2FrontendInstance
+          Port: 80
+
+  ALBTargetMonitoring:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: 'tg-monitoring'
+      Port: 80
+      Protocol: 'HTTP'
+      VpcId: !Ref TechStockVPC
+      TargetType: 'instance'
+      HealthCheckPath: '/grafana/api/health'
+      Targets:
+        - Id: !Ref EC2MonitoringInstance
+          Port: 80
+
+  ALBListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetBackend
+      LoadBalancerArn: !Ref TechStockALB
+      Port: 80
+      Protocol: 'HTTP'
+
+  RuleApi:
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+    Properties:
+      Actions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetBackend
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - '/api*'
+      ListenerArn: !Ref ALBListener
+      Priority: 1
+
+  RuleGrafana:
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+    Properties:
+      Actions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetMonitoring
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - '/grafana*'
+      ListenerArn: !Ref ALBListener
+      Priority: 2
+
+  RulePrometheus:
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+    Properties:
+      Actions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetMonitoring
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - '/prometheus*'
+      ListenerArn: !Ref ALBListener
+      Priority: 3
+
+  RuleFrontend:
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+    Properties:
+      Actions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetFrontend
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - '/*'
+      ListenerArn: !Ref ALBListener
+      Priority: 4
+
+Outputs:
+  ALBDNSName:
+    Description: 'DNS Name do ALB'
+    Value: !GetAtt TechStockALB.DNSName
+  BackendPrivateIP:
+    Description: 'IP Privado do Backend'
+    Value: !GetAtt EC2BackendInstance.PrivateIpAddress
+  RDSEndpoint:
+    Description: 'Endpoint de conexao do RDS'
+    Value: !GetAtt TechStockRDS.Endpoint.Address

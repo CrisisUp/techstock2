@@ -27,29 +27,40 @@ CREATE TABLE IF NOT EXISTS produtos (
 );
 
 CREATE TABLE IF NOT EXISTS movimentos (
-  id            SERIAL PRIMARY KEY,
-  produto_id    INT           NOT NULL REFERENCES produtos(id),
-  tipo          VARCHAR(10)   NOT NULL CHECK (tipo IN ('entrada','saida','ajuste')),
-  quantidade    INT           NOT NULL CHECK (quantidade > 0),
-  quantidade_anterior INT     NOT NULL,
-  quantidade_nova     INT     NOT NULL,
-  motivo        VARCHAR(200),
-  responsavel   VARCHAR(80)   NOT NULL DEFAULT 'sistema',
-  criado_em     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  id                  SERIAL PRIMARY KEY,
+  produto_id          INT           NOT NULL REFERENCES produtos(id),
+  tipo                VARCHAR(10)   NOT NULL CHECK (tipo IN ('entrada','saida','ajuste')),
+  quantidade          INT           NOT NULL CHECK (quantidade > 0),
+  quantidade_anterior INT           NOT NULL,
+  quantidade_nova     INT           NOT NULL,
+  motivo              VARCHAR(200),
+  responsavel         VARCHAR(80)   NOT NULL DEFAULT 'sistema',
+  criado_em           TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- Trigger: atualiza atualizado_em ao modificar produto
-CREATE OR REPLACE FUNCTION set_atualizado_em()
+-- ── Trigger & Automação ───────────────────────────────────────────────────────
+-- Atualiza automaticamente a coluna atualizado_em quando um produto for alterado
+CREATE OR REPLACE FUNCTION trigger_set_timestamp()
 RETURNS TRIGGER AS $$
-BEGIN NEW.atualizado_em = NOW(); RETURN NEW; END;
+BEGIN 
+  NEW.atualizado_em = NOW(); 
+  RETURN NEW; 
+END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_produtos_updated ON produtos;
 CREATE TRIGGER trg_produtos_updated
   BEFORE UPDATE ON produtos
-  FOR EACH ROW EXECUTE FUNCTION set_atualizado_em();
+  FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 
--- Dados iniciais
+-- ── Índices de Performance ────────────────────────────────────────────────────
+-- Otimiza a busca de produtos por categoria e filtros ativos (API /api/produtos)
+CREATE INDEX IF NOT EXISTS idx_produtos_categoria ON produtos(categoria_id) WHERE ativo = TRUE;
+
+-- Otimiza o histórico de movimentações por produto ordenado por data (API /api/movimentos/:id)
+CREATE INDEX IF NOT EXISTS idx_movimentos_produto_data ON movimentos(produto_id, criado_em DESC);
+
+-- ── Carga de Dados Iniciais (Seeds) ───────────────────────────────────────────
 INSERT INTO categorias (nome, cor) VALUES
   ('Informática',    '#6366f1'),
   ('Elétrico',       '#f59e0b'),

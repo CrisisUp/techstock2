@@ -6,10 +6,10 @@
 # =============================================================================
 
 echo ""
-echo "============================================"
+echo "======================================================="
 echo " TechStock — Setup Monitoring v3"
 echo " $(date)"
-echo "============================================"
+echo "======================================================="
 echo ""
 echo "Para começar, informe a região e o nome do secret."
 echo ""
@@ -77,9 +77,9 @@ echo ""
 # ══════════════════════════════════════════════════════════════════════════════
 # Apresenta valores e pergunta se deseja atualizar
 # ══════════════════════════════════════════════════════════════════════════════
-echo "============================================"
+echo "======================================================="
 echo " Valores atuais do secret"
-echo "============================================"
+echo "======================================================="
 echo "  ALB_DNS              = ${ALB_DNS:-'(não definido)'}"
 echo "  BACKEND_PRIVATE_IP   = ${BACKEND_PRIVATE_IP:-'(não definido)'}"
 echo "  GRAFANA_PASSWORD     = ${GRAFANA_PASSWORD:+'(definida)'}${GRAFANA_PASSWORD:-'(não definida)'}"
@@ -88,17 +88,18 @@ echo "  NODE_EXPORTER_VERSION= ${NODE_EXPORTER_VERSION}"
 echo "  DATASOURCE_UID       = ${DATASOURCE_UID}"
 echo "  GITHUB_RAW           = ${GITHUB_RAW:-'(não definido)'}"
 echo "  GITHUB_SUBDIR        = ${GITHUB_SUBDIR:-'(raiz)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 
 prompt_field() {
   local label="$1" current="$2" secret="$3"
+  local result
   if [[ "$secret" == "true" ]]; then
-    echo "  $label (Enter para manter):"
-    read -s -p "    → " result; echo ""
+    echo "  $label (Enter para manter):" >&2
+    read -s -p "    → " result </dev/tty; echo "" >&2
   else
-    echo "  $label (Enter para manter: ${current:-'(vazio)'}):"
-    read -p "    → " result
+    echo "  $label (Enter para manter: ${current:-'(vazio)'}):" >&2
+    read -p "    → " result </dev/tty
   fi
   echo "${result:-$current}"
 }
@@ -142,9 +143,9 @@ ERRORS=0
 [[ -z "$BACKEND_PRIVATE_IP" ]] && echo "  ⚠ BACKEND_PRIVATE_IP não definido — configure prometheus.yml depois"
 [[ $ERRORS -gt 0 ]] && { echo "  ✗ Corrija e execute novamente."; exit 1; }
 
-echo "============================================"
+echo "======================================================="
 echo " Resumo final"
-echo "============================================"
+echo "======================================================="
 echo "  SECRET_NAME          = $SECRET_NAME"
 echo "  AWS_REGION           = $AWS_REGION"
 echo "  ALB_DNS              = $ALB_DNS"
@@ -154,7 +155,7 @@ echo "  PROMETHEUS_VERSION   = $PROMETHEUS_VERSION"
 echo "  NODE_EXPORTER_VERSION= $NODE_EXPORTER_VERSION"
 echo "  DATASOURCE_UID       = $DATASOURCE_UID"
 echo "  GITHUB_BASE          = ${GITHUB_BASE:-'(importação manual)'}"
-echo "============================================"
+echo "======================================================="
 echo ""
 read -p "Confirma e salva no Secrets Manager? (s/N): " CONFIRM
 [[ "$CONFIRM" =~ ^[Ss]$ ]] || { echo "Cancelado."; exit 0; }
@@ -181,7 +182,7 @@ print(json.dumps({
 if [[ "$EXISTING" == "true" ]]; then
   aws secretsmanager put-secret-value \
     --secret-id "$SECRET_NAME" --secret-string "$SECRET_JSON" --region "$AWS_REGION" \
-    && echo "  ✓ Secret atualizado" || { echo "  ✗ Erro ao atualizar"; exit 1; }
+    && echo "  ✓ Secret updated" || { echo "  ✗ Erro ao atualizar"; exit 1; }
 else
   aws secretsmanager create-secret \
     --name "$SECRET_NAME" \
@@ -495,7 +496,20 @@ if GITHUB:
     for fpath in sorted(glob.glob(f"{DASH_DIR}/dashboard_techstock-*.json")):
         fname = os.path.basename(fpath)
         try:
-            payload = json.load(open(fpath))
+            # Correção crucial: Alinha o UID e envelopa o payload no formato exigido pela API do Grafana
+            dash_data = json.load(open(fpath))
+            dash_str = json.dumps(dash_data)
+            
+            # Garante que placeholders antigos de Data Source apontem para o UID dinâmico correto
+            for ph in ['"${DS_PROMETHEUS}"','"${DS_PROMETHEUS_1}"','${DS_PROMETHEUS}']:
+                dash_str = dash_str.replace(ph, f'"{DS_UID}"')
+                
+            final_dash = json.loads(dash_str)
+            final_dash["id"] = None
+            
+            # Envelopamento obrigatório da API corporativa do Grafana
+            payload = {"dashboard": final_dash, "overwrite": True, "folderId": 0}
+            
             result = gf("POST", "/api/dashboards/db", payload)
             if result.get("status") == "success":
                 print(f"  ✓ Importado: {fname} -> /grafana/d/{result.get('uid','?')}")
@@ -505,9 +519,6 @@ if GITHUB:
             print(f"  ✗ {fname}: {e}")
 else:
     print("\n⚠ GITHUB_BASE não definido — dashboards TechStock não importados.")
-    print("  Use o script novamente para definir GITHUB_RAW, ou importe manualmente:")
-    print("  curl -X POST http://localhost:3000/grafana/api/dashboards/db \\")
-    print(f"    -u admin:{PASS} -H Content-Type:application/json -d @dashboard_techstock-XXX.json")
 PYEOF
 
 dnf install -y amazon-cloudwatch-agent
@@ -523,9 +534,9 @@ CW
 systemctl enable amazon-cloudwatch-agent --now
 
 echo ""
-echo "============================================"
+echo "======================================================="
 echo " Verificação Final"
-echo "============================================"
+echo "======================================================="
 echo ""
 echo "Secret Manager:"
 aws secretsmanager describe-secret \
@@ -558,9 +569,9 @@ try:
     print(f\"  ✓ {d['title']}\")
 except: pass"
 echo ""
-echo "============================================"
+echo "======================================================="
 echo " Setup CONCLUÍDO: $(date)"
-echo "============================================"
+echo "======================================================="
 echo ""
 MY_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null)
 echo "IP privado: $MY_IP"

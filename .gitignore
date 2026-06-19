@@ -1,0 +1,33 @@
+# --- Backups e Arquivos Compactados ---
+backend.tar.gz
+backend_base64.txt
+resumo.txt
+
+# --- Sistema Operacional / IDEs ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Arquivos Sensíveis (Sempre bom prevenir) ---
+.env
+*.pem
+*.pkcs12
+*.key
+
+# --- Dependências e Builds Comuns (Caso o backend extraído use essas stacks) ---
+# Node.js
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Java / Maven / Gradle
+target/
+.gradle/
+build/
