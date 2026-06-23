@@ -1,409 +1,1071 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TechStock — Controle de Estoque</title>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <!-- CONFIGURAÇÕES VIA META TAGS                                       -->
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <meta name="api-url" content="http://localhost:3000">
+  <meta name="api-key" content="">
+
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<div class="topbar">
-  <div class="topbar-brand">
-    📦 TechStock <span>Controle de Estoque</span>
-    <span class="host-info" id="hostname-info"></span>
-  </div>
-  <div class="badge-group">
-    <div id="api-badge"   class="api-badge busy"       onclick="openConfig()"        title="API Backend — clique para configurar">⬤ API</div>
-    <div id="graf-badge"  class="api-badge badge-graf"  onclick="openService('graf')" title="Grafana — clique para abrir">⬤ Grafana</div>
-    <div id="prom-badge"  class="api-badge badge-prom"  onclick="openService('prom')" title="Prometheus — clique para abrir">⬤ Prometheus</div>
-  </div>
-</div>
+  <!-- Skip Link para Acessibilidade -->
+  <a href="#main-content" class="skip-link">Pular para conteúdo principal</a>
 
-<div class="nav">
-  <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
-  <button class="nav-btn"        onclick="showPage('produtos')">📦 Produtos</button>
-  <button class="nav-btn"        onclick="showPage('movimentacoes')">🔄 Movimentações</button>
-  <button class="nav-btn"        onclick="showPage('alertas')">🔔 Alertas</button>
-</div>
+  <div id="app" role="main" aria-label="TechStock - Controle de Estoque">
 
-<!-- DASHBOARD -->
-<div class="page active" id="page-dashboard">
-  <div class="cards">
-    <div class="card"><div class="card-icon">📦</div><div class="card-label">Total Produtos</div><div class="card-value" id="s-total">—</div></div>
-    <div class="card"><div class="card-icon">⚠️</div><div class="card-label">Alertas</div><div class="card-value warn" id="s-alert">—</div></div>
-    <div class="card"><div class="card-icon">💰</div><div class="card-label">Valor em Estoque</div><div class="card-value ok" id="s-valor">—</div></div>
-    <div class="card"><div class="card-icon">🔄</div><div class="card-label">Mov. 24h</div><div class="card-value" id="s-mov">—</div></div>
-  </div>
-  <div class="banner hidden" id="banner">⚠️ <span id="banner-txt"></span><button class="btn btn-sm btn-o" style="margin-left:auto" onclick="showPage('alertas')">Ver alertas</button></div>
-  <div class="tw">
-    <div class="th"><h2>Itens Críticos</h2></div>
-    <table><thead><tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Local</th><th>Estoque</th></tr></thead>
-    <tbody id="dash-tb"><tr class="empty"><td colspan="5"><span class="spin"></span>Carregando...</td></tr></tbody></table>
-  </div>
-</div>
-
-<!-- PRODUTOS -->
-<div class="page" id="page-produtos">
-  <div class="tw">
-    <div class="th">
-      <h2>Produtos</h2>
-      <div class="ta">
-        <input class="inp inp-w" id="busca" placeholder="🔍 Nome ou código..." oninput="debounce(loadProd,400)()">
-        <select class="inp" id="f-cat" onchange="loadProd()"><option value="">Todas categorias</option></select>
-        <button class="btn btn-p" onclick="openNovo()">+ Novo</button>
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- TOPBAR                                                           -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <header class="topbar" role="banner" aria-label="Cabeçalho do sistema">
+      <div class="topbar-brand">
+        📦 TechStock
+        <span aria-hidden="true">Controle de Estoque</span>
+        <span class="host-info" id="hostname-info" aria-label="Hostname do servidor"></span>
       </div>
-    </div>
-    <table><thead><tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Local</th><th>Estoque</th><th>Custo</th><th>Ações</th></tr></thead>
-    <tbody id="prod-tb"><tr class="empty"><td colspan="7"><span class="spin"></span>Carregando...</td></tr></tbody></table>
-  </div>
-</div>
-
-<!-- MOVIMENTAÇÕES -->
-<div class="page" id="page-movimentacoes">
-  <div class="tw">
-    <div class="th">
-      <h2>🔄 Movimentações</h2>
-      <div class="ta" style="flex-wrap:wrap;gap:8px">
-        <select class="inp" id="mn-tipo" onchange="_fetchMovs()" style="min-width:150px">
-          <option value="">Todos os tipos</option>
-          <option value="entrada">📥 Entrada</option>
-          <option value="saida">📤 Saída</option>
-          <option value="ajuste">⚖️ Ajuste</option>
-        </select>
-        <select class="inp" id="mn-prod" onchange="_fetchMovs()" style="min-width:220px">
-          <option value="">Todos os produtos</option>
-        </select>
-        <button class="btn btn-p" onclick="abrirNovaMovimentacao()">+ Nova Movimentação</button>
-      </div>
-    </div>
-    <div style="padding:6px 0 4px;font-size:13px;color:var(--muted)">
-      <span id="mov-count"></span>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Data/Hora</th>
-          <th>Tipo</th>
-          <th>Produto</th>
-          <th style="text-align:center">Qtd Anterior</th>
-          <th style="text-align:center">Movimentação</th>
-          <th style="text-align:center">Qtd Nova</th>
-          <th>Motivo · Responsável</th>
-        </tr>
-      </thead>
-      <tbody id="mov-tb">
-        <tr class="empty"><td colspan="7"><span class="spin"></span>Carregando...</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ALERTAS -->
-<div class="page" id="page-alertas">
-  <div class="tw">
-    <div class="th"><h2>🔔 Abaixo do Mínimo</h2></div>
-    <table><thead><tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Local</th><th>Estoque</th><th>Ações</th></tr></thead>
-    <tbody id="alert-tb"><tr class="empty"><td colspan="6"><span class="spin"></span>Carregando...</td></tr></tbody></table>
-  </div>
-</div>
-
-<!-- MODAL PRODUTO -->
-<div class="ov" id="ov-prod">
-  <div class="modal">
-    <div class="mh"><h3 id="m-prod-title">Novo Produto</h3><button class="mclose" onclick="closeModal('ov-prod')">✕</button></div>
-    <div class="mb">
-      <input type="hidden" id="p-id">
-      <div class="fr">
-        <div class="fg">
-          <label>Código <span style="font-size:11px;color:var(--muted);font-weight:400">(gerado automaticamente)</span></label>
-          <input class="inp" id="p-cod" readonly
-            style="background:#F1F5F9;color:#64748B;cursor:default"
-            placeholder="Selecione a categoria…">
+      <nav aria-label="Serviços externos">
+        <div class="badge-group">
+          <button id="api-badge" class="api-badge busy" onclick="openConfig()" aria-label="Configurar API"
+            title="API Backend — clique para configurar">
+            ⬤ API
+          </button>
+          <button id="graf-badge" class="api-badge badge-graf" onclick="openService('graf')" aria-label="Abrir Grafana"
+            title="Grafana — clique para abrir">
+            ⬤ Grafana
+          </button>
+          <button id="prom-badge" class="api-badge badge-prom" onclick="openService('prom')"
+            aria-label="Abrir Prometheus" title="Prometheus — clique para abrir">
+            ⬤ Prometheus
+          </button>
         </div>
-        <div class="fg"><label>Unidade</label>
-          <select class="inp" id="p-un">
-            <option value="un">un</option><option value="cx">cx</option>
-            <option value="rolo">rolo</option><option value="kg">kg</option>
-            <option value="lt">lt</option><option value="m">m</option>
-          </select>
+      </nav>
+    </header>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVEGAÇÃO PRINCIPAL                                              -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <nav class="nav" role="tablist" aria-label="Navegação principal">
+      <button role="tab" aria-selected="true" aria-controls="page-dashboard" id="tab-dashboard" class="nav-btn active"
+        onclick="showPage('dashboard')">
+        <span aria-hidden="true">📊</span> Dashboard
+      </button>
+      <button role="tab" aria-selected="false" aria-controls="page-produtos" id="tab-produtos" class="nav-btn"
+        onclick="showPage('produtos')">
+        <span aria-hidden="true">📦</span> Produtos
+      </button>
+      <button role="tab" aria-selected="false" aria-controls="page-movimentacoes" id="tab-movimentacoes" class="nav-btn"
+        onclick="showPage('movimentacoes')">
+        <span aria-hidden="true">🔄</span> Movimentações
+      </button>
+      <button role="tab" aria-selected="false" aria-controls="page-alertas" id="tab-alertas" class="nav-btn"
+        onclick="showPage('alertas')">
+        <span aria-hidden="true">🔔</span> Alertas
+      </button>
+    </nav>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- CONTEÚDO PRINCIPAL                                               -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <main id="main-content">
+
+      <!-- ==================== DASHBOARD ==================== -->
+      <section class="page active" id="page-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+
+        <!-- Cards -->
+        <div class="cards" aria-label="Métricas do sistema">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">📦</div>
+            <div class="card-label">Total Produtos</div>
+            <div class="card-value" id="s-total" aria-label="Total de produtos">—</div>
+          </article>
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">⚠️</div>
+            <div class="card-label">Alertas</div>
+            <div class="card-value warn" id="s-alert" aria-label="Quantidade de alertas">—</div>
+          </article>
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">💰</div>
+            <div class="card-label">Valor em Estoque</div>
+            <div class="card-value ok" id="s-valor" aria-label="Valor total em estoque">—</div>
+          </article>
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">🔄</div>
+            <div class="card-label">Mov. 24h</div>
+            <div class="card-value" id="s-mov" aria-label="Movimentações nas últimas 24 horas">—</div>
+          </article>
+        </div>
+
+        <!-- Banner de Alertas -->
+        <div class="banner hidden" id="banner" role="alert" aria-live="polite">
+          <span aria-hidden="true">⚠️</span>
+          <span id="banner-txt"></span>
+          <button class="btn btn-sm btn-o" onclick="showPage('alertas')" style="margin-left:auto">
+            Ver alertas
+          </button>
+        </div>
+
+        <!-- Tabela de Itens Críticos -->
+        <div class="tw">
+          <div class="th">
+            <h2>Itens Críticos</h2>
+          </div>
+          <div class="table-wrapper">
+            <table aria-label="Produtos com estoque crítico">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Local</th>
+                  <th>Estoque</th>
+                </tr>
+              </thead>
+              <tbody id="dash-tb">
+                <tr class="empty">
+                  <td colspan="5"><span class="spin" aria-hidden="true"></span>Carregando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== PRODUTOS ==================== -->
+      <section class="page" id="page-produtos" role="tabpanel" aria-labelledby="tab-produtos">
+
+        <div class="tw">
+          <div class="th">
+            <h2>Produtos</h2>
+            <div class="ta">
+              <label for="busca" class="sr-only">Buscar produtos</label>
+              <input class="inp inp-w" id="busca" placeholder="🔍 Nome ou código..."
+                aria-label="Buscar produtos por nome ou código">
+
+              <label for="f-cat" class="sr-only">Filtrar por categoria</label>
+              <select class="inp" id="f-cat" aria-label="Filtrar por categoria">
+                <option value="">Todas categorias</option>
+              </select>
+
+              <button class="btn btn-p" onclick="openNovo()" aria-label="Adicionar novo produto">
+                <span aria-hidden="true">+</span> Novo
+              </button>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table aria-label="Lista de produtos">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Local</th>
+                  <th>Estoque</th>
+                  <th>Custo</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="prod-tb">
+                <tr class="empty">
+                  <td colspan="7"><span class="spin" aria-hidden="true"></span>Carregando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== MOVIMENTAÇÕES ==================== -->
+      <section class="page" id="page-movimentacoes" role="tabpanel" aria-labelledby="tab-movimentacoes">
+
+        <div class="tw">
+          <div class="th">
+            <h2>🔄 Movimentações</h2>
+            <div class="ta" style="flex-wrap:wrap;gap:8px">
+              <label for="mn-tipo" class="sr-only">Filtrar por tipo</label>
+              <select class="inp" id="mn-tipo" style="min-width:150px" aria-label="Filtrar por tipo de movimentação">
+                <option value="">Todos os tipos</option>
+                <option value="entrada">📥 Entrada</option>
+                <option value="saida">📤 Saída</option>
+                <option value="ajuste">⚖️ Ajuste</option>
+              </select>
+
+              <label for="mn-prod" class="sr-only">Filtrar por produto</label>
+              <select class="inp" id="mn-prod" style="min-width:220px" aria-label="Filtrar por produto">
+                <option value="">Todos os produtos</option>
+              </select>
+
+              <button class="btn btn-p" onclick="abrirNovaMovimentacao()" aria-label="Nova movimentação">
+                <span aria-hidden="true">+</span> Nova Movimentação
+              </button>
+            </div>
+          </div>
+
+          <div style="padding:6px 0 4px;font-size:13px;color:var(--muted)">
+            <span id="mov-count" aria-live="polite"></span>
+          </div>
+
+          <div class="table-wrapper">
+            <table aria-label="Histórico de movimentações">
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Tipo</th>
+                  <th>Produto</th>
+                  <th style="text-align:center">Qtd Anterior</th>
+                  <th style="text-align:center">Movimentação</th>
+                  <th style="text-align:center">Qtd Nova</th>
+                  <th>Motivo · Responsável</th>
+                </tr>
+              </thead>
+              <tbody id="mov-tb">
+                <tr class="empty">
+                  <td colspan="7"><span class="spin" aria-hidden="true"></span>Carregando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== ALERTAS ==================== -->
+      <section class="page" id="page-alertas" role="tabpanel" aria-labelledby="tab-alertas">
+
+        <div class="tw">
+          <div class="th">
+            <h2>🔔 Abaixo do Mínimo</h2>
+          </div>
+
+          <div class="table-wrapper">
+            <table aria-label="Produtos com estoque abaixo do mínimo">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th>Local</th>
+                  <th>Estoque</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="alert-tb">
+                <tr class="empty">
+                  <td colspan="6"><span class="spin" aria-hidden="true"></span>Carregando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL PRODUTO                                                    -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="ov" id="ov-prod" role="dialog" aria-modal="true" aria-labelledby="m-prod-title">
+      <div class="modal">
+        <div class="mh">
+          <h3 id="m-prod-title">Novo Produto</h3>
+          <button class="mclose" onclick="closeModal('ov-prod')" aria-label="Fechar modal">
+            ✕
+          </button>
+        </div>
+        <div class="mb">
+          <input type="hidden" id="p-id">
+
+          <div class="fr">
+            <div class="fg">
+              <label for="p-cod">Código <span style="font-size:11px;color:var(--muted);font-weight:400">(gerado
+                  automaticamente)</span></label>
+              <input class="inp" id="p-cod" readonly style="background:#F1F5F9;color:#64748B;cursor:default"
+                placeholder="Selecione a categoria…" aria-describedby="p-cod-hint">
+              <div id="p-cod-hint" class="hint">Código gerado automaticamente</div>
+            </div>
+            <div class="fg">
+              <label for="p-un">Unidade</label>
+              <select class="inp" id="p-un">
+                <option value="un">un</option>
+                <option value="cx">cx</option>
+                <option value="rolo">rolo</option>
+                <option value="kg">kg</option>
+                <option value="lt">lt</option>
+                <option value="m">m</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label for="p-nome">Nome *</label>
+            <input class="inp" id="p-nome" placeholder="Nome do produto" aria-required="true"
+              aria-describedby="p-nome-error">
+            <div class="field-error" id="p-nome-error"></div>
+          </div>
+
+          <div class="fg">
+            <label for="p-desc">Descrição</label>
+            <input class="inp" id="p-desc" placeholder="Opcional">
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label for="p-cat">Categoria</label>
+              <select class="inp" id="p-cat" onchange="onCatChange()">
+                <option value="">Sem categoria</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label for="p-loc">Localização</label>
+              <input class="inp" id="p-loc" placeholder="A1-01">
+            </div>
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label for="p-qty">Qtd. Inicial</label>
+              <input class="inp" type="number" id="p-qty" value="0" min="0" aria-describedby="p-qty-hint">
+              <div id="p-qty-hint" style="margin-top:4px;min-height:16px"></div>
+            </div>
+            <div class="fg">
+              <label for="p-min">Qtd. Mínima</label>
+              <input class="inp" type="number" id="p-min" value="5" min="0">
+            </div>
+          </div>
+
+          <div class="fg">
+            <label for="p-custo">Preço de Custo (R$)</label>
+            <input class="inp" type="number" id="p-custo" value="0" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn btn-o" onclick="closeModal('ov-prod')">Cancelar</button>
+          <button class="btn btn-p" onclick="saveProd()">💾 Salvar</button>
         </div>
       </div>
-      <div class="fg"><label>Nome *</label><input class="inp" id="p-nome" placeholder="Nome do produto"></div>
-      <div class="fg"><label>Descrição</label><input class="inp" id="p-desc" placeholder="Opcional"></div>
-      <div class="fr">
-        <div class="fg"><label>Categoria</label><select class="inp" id="p-cat" onchange="onCatChange()"><option value="">Sem categoria</option></select></div>
-        <div class="fg"><label>Localização</label><input class="inp" id="p-loc" placeholder="A1-01"></div>
-      </div>
-      <div class="fr">
-        <div class="fg">
-          <label>Qtd. Inicial</label>
-          <input class="inp" type="number" id="p-qty" value="0" min="0">
-          <div id="p-qty-hint" style="margin-top:4px;min-height:16px"></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL MOVIMENTAÇÃO RÁPIDA                                        -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="ov" id="ov-mov" role="dialog" aria-modal="true" aria-labelledby="m-mov-title">
+      <div class="modal">
+        <div class="mh">
+          <h3 id="m-mov-title">Movimentar Estoque</h3>
+          <button class="mclose" onclick="closeModal('ov-mov')" aria-label="Fechar modal">
+            ✕
+          </button>
         </div>
-        <div class="fg"><label>Qtd. Mínima</label><input class="inp" type="number" id="p-min" value="5" min="0"></div>
+        <div class="mb">
+          <input type="hidden" id="m-pid">
+
+          <div class="fg">
+            <label>Produto</label>
+            <div id="m-pnome" style="font-weight:600;font-size:15px;padding:6px 0"></div>
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label for="m-tipo">Tipo *</label>
+              <select class="inp" id="m-tipo" aria-required="true">
+                <option value="saida">📤 Saída</option>
+                <option value="entrada">📥 Entrada</option>
+                <option value="ajuste">⚖️ Ajuste</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label for="m-qty">Quantidade *</label>
+              <input class="inp" type="number" id="m-qty" value="1" min="1" aria-required="true">
+            </div>
+          </div>
+
+          <div class="fg">
+            <label for="m-motivo">Motivo</label>
+            <input class="inp" id="m-motivo" placeholder="Ex: Venda NF-001, Reposição, Inventário">
+          </div>
+
+          <div class="fg">
+            <label for="m-resp">Responsável</label>
+            <input class="inp" id="m-resp" value="web" placeholder="Nome ou matrícula">
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn btn-o" onclick="closeModal('ov-mov')">Cancelar</button>
+          <button class="btn btn-p" onclick="saveMov()">✅ Confirmar</button>
+        </div>
       </div>
-      <div class="fg"><label>Preço de Custo (R$)</label><input class="inp" type="number" id="p-custo" value="0" step="0.01" min="0"></div>
     </div>
-    <div class="mf">
-      <button class="btn btn-o" onclick="closeModal('ov-prod')">Cancelar</button>
-      <button class="btn btn-p" onclick="saveProd()">💾 Salvar</button>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL NOVA MOVIMENTAÇÃO                                          -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="ov" id="ov-mov-novo" role="dialog" aria-modal="true" aria-labelledby="mn-mov-title">
+      <div class="modal">
+        <div class="mh">
+          <h3 id="mn-mov-title">🔄 Nova Movimentação</h3>
+          <button class="mclose" onclick="closeModal('ov-mov-novo')" aria-label="Fechar modal">
+            ✕
+          </button>
+        </div>
+        <div class="mb">
+          <input type="hidden" id="mn-mov-pid">
+
+          <div class="fg">
+            <label for="mn-mov-psel">Produto *</label>
+            <select class="inp" id="mn-mov-psel" onchange="onMovProdSelect()" aria-required="true">
+              <option value="">Selecione o produto...</option>
+            </select>
+            <div id="mn-mov-pnome" style="font-size:12px;color:var(--muted);margin-top:4px;min-height:16px"></div>
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label for="mn-mov-tipo">Tipo *</label>
+              <select class="inp" id="mn-mov-tipo" aria-required="true">
+                <option value="saida">📤 Saída</option>
+                <option value="entrada">📥 Entrada</option>
+                <option value="ajuste">⚖️ Ajuste</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label for="mn-mov-qty">Quantidade *</label>
+              <input class="inp" type="number" id="mn-mov-qty" value="1" min="1" aria-required="true">
+            </div>
+          </div>
+
+          <div class="fg">
+            <label for="mn-mov-motivo">Motivo</label>
+            <input class="inp" id="mn-mov-motivo" placeholder="Ex: Venda NF-001, Reposição, Ajuste inventário">
+          </div>
+
+          <div class="fg">
+            <label for="mn-mov-resp">Responsável</label>
+            <input class="inp" id="mn-mov-resp" value="web" placeholder="Nome ou matrícula">
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn btn-o" onclick="closeModal('ov-mov-novo')">Cancelar</button>
+          <button class="btn btn-p" onclick="saveMovNovo()">✅ Confirmar</button>
+        </div>
+      </div>
     </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL HISTÓRICO                                                  -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="ov" id="ov-hist" role="dialog" aria-modal="true" aria-labelledby="hist-title">
+      <div class="modal" style="max-width:460px">
+        <div class="mh">
+          <h3 id="hist-title">Histórico de Movimentos</h3>
+          <button class="mclose" onclick="closeModal('ov-hist')" aria-label="Fechar modal">
+            ✕
+          </button>
+        </div>
+        <div class="mb" id="hist-body">
+          <div class="empty" style="text-align:center;padding:30px">
+            <span class="spin" aria-hidden="true"></span>Carregando...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL CONFIGURAÇÃO - COM API KEY                                 -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="ov" id="ov-cfg" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
+      <div class="modal" style="max-width:560px">
+        <div class="mh">
+          <h3 id="cfg-title">⚙ Configuração da API</h3>
+          <button class="mclose" onclick="closeModal('ov-cfg')" aria-label="Fechar modal">
+            ✕
+          </button>
+        </div>
+        <div class="mb">
+          <!-- ── Backend ── -->
+          <div class="cfg-section">
+            <div class="cfg-section-label">🔵 Backend / API</div>
+            <div class="fg">
+              <label for="cfg-url">URL do Backend (DNS do ALB)</label>
+              <input class="inp" id="cfg-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com"
+                style="width:100%" aria-describedby="cfg-url-hint">
+              <div class="url-cur">Atual: <span id="cfg-atual"></span></div>
+              <div id="cfg-url-hint" class="hint">DNS do ALB sem barra no final. Salvo no localStorage.</div>
+            </div>
+
+            <!-- ── API Key ── -->
+            <div class="fg" style="margin-top:12px">
+              <label for="cfg-api-key">🔑 API Key (opcional)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="inp" id="cfg-api-key" type="password" placeholder="Digite sua API Key..." style="flex:1"
+                  aria-describedby="cfg-api-key-hint">
+                <button class="btn btn-sm btn-o" onclick="toggleApiKeyVisibility()" title="Mostrar/Esconder API Key"
+                  style="flex-shrink:0">
+                  👁️
+                </button>
+                <button class="btn btn-sm btn-r" onclick="clearApiKey()" title="Remover API Key" style="flex-shrink:0">
+                  🗑️
+                </button>
+              </div>
+              <div id="cfg-api-key-hint" class="hint">
+                Status: <span id="cfg-api-key-status">⚠️ Não configurada</span>
+              </div>
+            </div>
+
+            <div class="tr-res" id="cfg-res" role="status" aria-live="polite"></div>
+          </div>
+
+          <!-- ── Grafana ── -->
+          <div class="cfg-section">
+            <div class="cfg-section-label">🟠 Grafana</div>
+            <div class="fg">
+              <label for="cfg-graf-url">URL do Grafana</label>
+              <input class="inp" id="cfg-graf-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com/grafana"
+                style="width:100%" aria-describedby="cfg-graf-hint">
+              <div class="url-cur">Atual: <span id="cfg-graf-atual"></span></div>
+              <div id="cfg-graf-hint" class="hint">URL completa incluindo /grafana. Clique no badge ⬤ Grafana para abrir
+                em nova aba.</div>
+            </div>
+            <div class="tr-res" id="cfg-graf-res" role="status" aria-live="polite"></div>
+          </div>
+
+          <!-- ── Prometheus ── -->
+          <div class="cfg-section">
+            <div class="cfg-section-label">🔴 Prometheus</div>
+            <div class="fg">
+              <label for="cfg-prom-url">URL do Prometheus</label>
+              <input class="inp" id="cfg-prom-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com/prometheus"
+                style="width:100%" aria-describedby="cfg-prom-hint">
+              <div class="url-cur">Atual: <span id="cfg-prom-atual"></span></div>
+              <div id="cfg-prom-hint" class="hint">URL completa incluindo /prometheus. Clique no badge ⬤ Prometheus para
+                abrir em nova aba.</div>
+            </div>
+            <div class="tr-res" id="cfg-prom-res" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn btn-o" onclick="closeModal('ov-cfg')">Cancelar</button>
+          <button class="btn btn-o" onclick="testAllServices()">🔌 Testar todos</button>
+          <button class="btn btn-p" onclick="saveConfig()">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- BOTÃO FLUTUANTE CONFIG                                           -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <button id="btn-cfg" onclick="openConfig()" title="Configurar endpoint da API"
+      aria-label="Configurações do sistema">
+      ⚙
+    </button>
+
   </div>
-</div>
 
-<!-- MODAL MOVIMENTAÇÃO RÁPIDA (via botão ↕ na tabela de produtos) -->
-<div class="ov" id="ov-mov">
-  <div class="modal">
-    <div class="mh"><h3>Movimentar Estoque</h3><button class="mclose" onclick="closeModal('ov-mov')">✕</button></div>
-    <div class="mb">
-      <input type="hidden" id="m-pid">
-      <div class="fg"><label>Produto</label><div id="m-pnome" style="font-weight:600;font-size:15px;padding:6px 0"></div></div>
-      <div class="fr">
-        <div class="fg"><label>Tipo *</label>
-          <select class="inp" id="m-tipo">
-            <option value="saida">📤 Saída</option>
-            <option value="entrada">📥 Entrada</option>
-            <option value="ajuste">⚖️ Ajuste</option>
-          </select>
-        </div>
-        <div class="fg"><label>Quantidade *</label><input class="inp" type="number" id="m-qty" value="1" min="1"></div>
-      </div>
-      <div class="fg"><label>Motivo</label><input class="inp" id="m-motivo" placeholder="Ex: Venda NF-001, Reposição, Inventário"></div>
-      <div class="fg"><label>Responsável</label><input class="inp" id="m-resp" value="web" placeholder="Nome ou matrícula"></div>
-    </div>
-    <div class="mf">
-      <button class="btn btn-o" onclick="closeModal('ov-mov')">Cancelar</button>
-      <button class="btn btn-p" onclick="saveMov()">✅ Confirmar</button>
-    </div>
-  </div>
-</div>
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <!-- SCRIPTS                                                            -->
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 
-<!-- MODAL NOVA MOVIMENTAÇÃO (via página Movimentações) -->
-<div class="ov" id="ov-mov-novo">
-  <div class="modal">
-    <div class="mh"><h3>🔄 Nova Movimentação</h3><button class="mclose" onclick="closeModal('ov-mov-novo')">✕</button></div>
-    <div class="mb">
-      <input type="hidden" id="mn-mov-pid">
-      <div class="fg">
-        <label>Produto *</label>
-        <select class="inp" id="mn-mov-psel" onchange="onMovProdSelect()">
-          <option value="">Selecione o produto...</option>
-        </select>
-        <div id="mn-mov-pnome" style="font-size:12px;color:var(--muted);margin-top:4px;min-height:16px"></div>
-      </div>
-      <div class="fr">
-        <div class="fg"><label>Tipo *</label>
-          <select class="inp" id="mn-mov-tipo">
-            <option value="saida">📤 Saída</option>
-            <option value="entrada">📥 Entrada</option>
-            <option value="ajuste">⚖️ Ajuste</option>
-          </select>
-        </div>
-        <div class="fg"><label>Quantidade *</label><input class="inp" type="number" id="mn-mov-qty" value="1" min="1"></div>
-      </div>
-      <div class="fg"><label>Motivo</label><input class="inp" id="mn-mov-motivo" placeholder="Ex: Venda NF-001, Reposição, Ajuste inventário"></div>
-      <div class="fg"><label>Responsável</label><input class="inp" id="mn-mov-resp" value="web" placeholder="Nome ou matrícula"></div>
-    </div>
-    <div class="mf">
-      <button class="btn btn-o" onclick="closeModal('ov-mov-novo')">Cancelar</button>
-      <button class="btn btn-p" onclick="saveMovNovo()">✅ Confirmar</button>
-    </div>
-  </div>
-</div>
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <!-- INLINE SCRIPTS - Configuração e API Key Management                -->
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      'use strict';
 
-<!-- MODAL HISTÓRICO -->
-<div class="ov" id="ov-hist">
-  <div class="modal" style="max-width:460px">
-    <div class="mh"><h3>Histórico de Movimentos</h3><button class="mclose" onclick="closeModal('ov-hist')">✕</button></div>
-    <div class="mb" id="hist-body"><div class="empty" style="text-align:center;padding:30px"><span class="spin"></span>Carregando...</div></div>
-  </div>
-</div>
+      // ──────────────────────────────────────────────────────────────
+      // CONSTANTES DE LOCALSTORAGE
+      // ──────────────────────────────────────────────────────────────
+      const LS_GRAF = 'techstock_grafana_url';
+      const LS_PROM = 'techstock_prometheus_url';
+      const LS_API_KEY = 'techstock_api_key';
 
-<!-- MODAL CONFIG -->
-<div class="ov" id="ov-cfg">
-  <div class="modal" style="max-width:480px">
-    <div class="mh"><h3>⚙ Configuração da API</h3><button class="mclose" onclick="closeModal('ov-cfg')">✕</button></div>
-    <div class="mb">
-      <div class="cfg-section">
-        <div class="cfg-section-label">🔵 Backend / API</div>
-        <div class="fg">
-          <label>URL do Backend (DNS do ALB)</label>
-          <input class="inp" id="cfg-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com" style="width:100%">
-          <div class="url-cur">Atual: <span id="cfg-atual"></span></div>
-          <div class="hint">DNS do ALB sem barra no final. Salvo no localStorage.</div>
-        </div>
-        <div class="tr-res" id="cfg-res"></div>
-      </div>
-      <div class="cfg-section">
-        <div class="cfg-section-label">🟠 Grafana</div>
-        <div class="fg">
-          <label>URL do Grafana</label>
-          <input class="inp" id="cfg-graf-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com/grafana" style="width:100%">
-          <div class="url-cur">Atual: <span id="cfg-graf-atual"></span></div>
-          <div class="hint">URL completa incluindo /grafana. Clique no badge ⬤ Grafana para abrir em nova aba.</div>
-        </div>
-        <div class="tr-res" id="cfg-graf-res"></div>
-      </div>
-      <div class="cfg-section">
-        <div class="cfg-section-label">🔴 Prometheus</div>
-        <div class="fg">
-          <label>URL do Prometheus</label>
-          <input class="inp" id="cfg-prom-url" placeholder="http://SEU-ALB.us-east-1.elb.amazonaws.com/prometheus" style="width:100%">
-          <div class="url-cur">Atual: <span id="cfg-prom-atual"></span></div>
-          <div class="hint">URL completa incluindo /prometheus. Clique no badge ⬤ Prometheus para abrir em nova aba.</div>
-        </div>
-        <div class="tr-res" id="cfg-prom-res"></div>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn btn-o" onclick="closeModal('ov-cfg')">Cancelar</button>
-      <button class="btn btn-o" onclick="testAllServices()">🔌 Testar todos</button>
-      <button class="btn btn-p" onclick="saveConfig()">💾 Salvar</button>
-    </div>
-  </div>
-</div>
+      // ──────────────────────────────────────────────────────────────
+      // SERVIÇOS EXTERNOS (Grafana / Prometheus)
+      // ──────────────────────────────────────────────────────────────
+      function getGrafUrl() {
+        return localStorage.getItem(LS_GRAF) || '';
+      }
+      function getPromUrl() {
+        return localStorage.getItem(LS_PROM) || '';
+      }
+      function setGrafUrl(u) {
+        localStorage.setItem(LS_GRAF, u.replace(/\/$/, ''));
+      }
+      function setPromUrl(u) {
+        localStorage.setItem(LS_PROM, u.replace(/\/$/, ''));
+      }
 
-<button id="btn-cfg" onclick="openConfig()" title="Configurar endpoint da API">⚙</button>
+      window.openService = function (svc) {
+        const url = svc === 'graf' ? getGrafUrl() : getPromUrl();
+        if (!url) {
+          openConfig();
+          return;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
+      };
 
-<!-- config.js DEVE ser carregado ANTES de app.js -->
-<script src="config.js"></script>
-<script src="app.js"></script>
+      async function checkService(url, badgeId) {
+        const el = document.getElementById(badgeId);
+        if (!el) return;
 
-<style>
-/* ── Badge group ──────────────────────────────────────────────────────────── */
-.badge-group { display:flex; align-items:center; gap:6px; }
+        const label = badgeId === 'graf-badge' ? 'Grafana' : 'Prometheus';
+        if (!url) {
+          el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' fail';
+          el.textContent = '⬤ ' + label;
+          return;
+        }
 
-.badge-graf { color:#fbbf24 !important; }
-.badge-graf.ok   { color:#86efac !important; }
-.badge-graf.fail { color:#fca5a5 !important; }
-.badge-graf.busy { color:#fbbf24 !important; }
+        el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' busy';
+        try {
+          await fetch(url, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(6000),
+            mode: 'no-cors'
+          });
+          el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' ok';
+        } catch {
+          el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' fail';
+        }
+        el.textContent = '⬤ ' + label;
+      }
 
-.badge-prom { color:#f9a8d4 !important; }
-.badge-prom.ok   { color:#86efac !important; }
-.badge-prom.fail { color:#fca5a5 !important; }
-.badge-prom.busy { color:#f9a8d4 !important; }
+      window.testService = async function (svc) {
+        const isGraf = svc === 'graf';
+        const urlEl = document.getElementById(isGraf ? 'cfg-graf-url' : 'cfg-prom-url');
+        const resEl = document.getElementById(isGraf ? 'cfg-graf-res' : 'cfg-prom-res');
+        const url = urlEl.value.trim().replace(/\/$/, '');
 
-#graf-badge, #prom-badge { cursor:pointer; }
-#graf-badge:hover, #prom-badge:hover { background:rgba(255,255,255,.3); }
+        if (!url) {
+          resEl.className = 'tr-res fail';
+          resEl.textContent = '❌ Informe a URL';
+          return;
+        }
 
-/* Config modal sections */
-.cfg-section { border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:14px; }
-.cfg-section:last-child { margin-bottom:0; }
-.cfg-section-label { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px; }
-#ov-cfg .modal { max-width:560px; }
+        resEl.className = 'tr-res busy';
+        resEl.textContent = '🔌 Testando...';
 
-/* Movimentações — cores inline */
-.pos { color:var(--green, #22c55e); }
-.neg { color:var(--red,   #ef4444); }
-</style>
+        try {
+          await fetch(url, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(6000),
+            mode: 'no-cors'
+          });
+          resEl.className = 'tr-res ok';
+          resEl.textContent = '✅ Acessível em ' + url;
+        } catch (e) {
+          resEl.className = 'tr-res fail';
+          resEl.textContent = '❌ ' + e.message;
+        }
+      };
 
-<script>
-/* ── Constantes de localStorage ─────────────────────────────────────────── */
-const LS_GRAF = 'techstock_grafana_url';
-const LS_PROM = 'techstock_prometheus_url';
+      window.testAllServices = function () {
+        if (typeof testApi === 'function') testApi();
+        testService('graf');
+        testService('prom');
+      };
 
-function getGrafUrl() { return localStorage.getItem(LS_GRAF) || ''; }
-function getPromUrl() { return localStorage.getItem(LS_PROM) || ''; }
-function setGrafUrl(u) { localStorage.setItem(LS_GRAF, u.replace(/\/$/, '')); }
-function setPromUrl(u) { localStorage.setItem(LS_PROM, u.replace(/\/$/, '')); }
+      // ──────────────────────────────────────────────────────────────
+      // API KEY MANAGEMENT
+      // ──────────────────────────────────────────────────────────────
+      function getApiKey() {
+        return window.API_KEY || localStorage.getItem(LS_API_KEY) || '';
+      }
 
-function openService(svc) {
-  const url = svc === 'graf' ? getGrafUrl() : getPromUrl();
-  if (!url) { openConfig(); return; }
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
+      function setApiKey(key) {
+        if (key && key.trim()) {
+          window.API_KEY = key.trim();
+          localStorage.setItem(LS_API_KEY, key.trim());
+        } else {
+          window.API_KEY = '';
+          localStorage.removeItem(LS_API_KEY);
+        }
+      }
 
-async function checkService(url, badgeId) {
-  const el = document.getElementById(badgeId);
-  if (!el) return;
-  const label = badgeId === 'graf-badge' ? 'Grafana' : 'Prometheus';
-  if (!url) {
-    el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' fail';
-    el.textContent = '⬤ ' + label; return;
-  }
-  el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' busy';
-  try {
-    await fetch(url, { method:'HEAD', signal:AbortSignal.timeout(6000), mode:'no-cors' });
-    el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' ok';
-  } catch {
-    el.className = el.className.replace(/\b(ok|fail|busy)\b/g, '').trim() + ' fail';
-  }
-  el.textContent = '⬤ ' + label;
-}
+      // Expor funções globalmente
+      window.getApiKey = getApiKey;
+      window.setApiKey = setApiKey;
 
-async function testService(svc) {
-  const isGraf = svc === 'graf';
-  const urlEl  = document.getElementById(isGraf ? 'cfg-graf-url' : 'cfg-prom-url');
-  const resEl  = document.getElementById(isGraf ? 'cfg-graf-res' : 'cfg-prom-res');
-  const url    = urlEl.value.trim().replace(/\/$/, '');
-  if (!url) { resEl.className = 'tr-res fail'; resEl.textContent = '❌ Informe a URL'; return; }
-  resEl.className = 'tr-res busy'; resEl.textContent = '🔌 Testando...';
-  try {
-    await fetch(url, { method:'HEAD', signal:AbortSignal.timeout(6000), mode:'no-cors' });
-    resEl.className = 'tr-res ok'; resEl.textContent = '✅ Acessível em ' + url;
-  } catch (e) {
-    resEl.className = 'tr-res fail'; resEl.textContent = '❌ ' + e.message;
-  }
-}
+      // ──────────────────────────────────────────────────────────────
+      // CONFIGURAÇÃO (Override)
+      // ──────────────────────────────────────────────────────────────
+      const _origOpenConfig = window.openConfig || function () { };
 
-async function testAllServices() {
-  testApi();
-  testService('graf');
-  testService('prom');
-}
+      window.openConfig = function () {
+        _origOpenConfig();
 
-const _origOpenConfig = openConfig;
-openConfig = function() {
-  _origOpenConfig();
-  document.getElementById('cfg-graf-url').value         = getGrafUrl();
-  document.getElementById('cfg-graf-atual').textContent = getGrafUrl() || '(não configurado)';
-  document.getElementById('cfg-graf-res').textContent   = '';
-  document.getElementById('cfg-graf-res').className     = 'tr-res';
-  document.getElementById('cfg-prom-url').value         = getPromUrl();
-  document.getElementById('cfg-prom-atual').textContent = getPromUrl() || '(não configurado)';
-  document.getElementById('cfg-prom-res').textContent   = '';
-  document.getElementById('cfg-prom-res').className     = 'tr-res';
-};
+        // Preencher URL
+        const urlEl = document.getElementById('cfg-url');
+        const atualEl = document.getElementById('cfg-atual');
+        if (urlEl) urlEl.value = getApiUrl();
+        if (atualEl) atualEl.textContent = getApiUrl() || '(não configurado)';
 
-const _origSaveConfig = saveConfig;
-saveConfig = function() {
-  const grafUrl = document.getElementById('cfg-graf-url').value.trim().replace(/\/$/, '');
-  const promUrl = document.getElementById('cfg-prom-url').value.trim().replace(/\/$/, '');
-  if (grafUrl) setGrafUrl(grafUrl);
-  if (promUrl) setPromUrl(promUrl);
-  _origSaveConfig();
-};
+        // Preencher API Key
+        const keyEl = document.getElementById('cfg-api-key');
+        if (keyEl) {
+          const currentKey = getApiKey();
+          keyEl.value = currentKey || '';
+        }
 
-/* Popula select de produtos no modal nova movimentação */
-async function _populateMovNovoProdSel() {
-  const sel = document.getElementById('mn-mov-psel');
-  if (!sel || sel.dataset.loaded) return;
-  try {
-    const prods = await api('/api/produtos');
-    sel.innerHTML = '<option value="">Selecione o produto...</option>' +
-      prods.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
-    sel.dataset.loaded = '1';
-  } catch { /* silencioso */ }
-}
+        // Preencher Grafana
+        const grafUrl = document.getElementById('cfg-graf-url');
+        const grafAtual = document.getElementById('cfg-graf-atual');
+        if (grafUrl) grafUrl.value = getGrafUrl();
+        if (grafAtual) grafAtual.textContent = getGrafUrl() || '(não configurado)';
 
-/* Override abrirNovaMovimentacao para popular select no momento certo */
-const _origAbrirNovaMov = abrirNovaMovimentacao;
-abrirNovaMovimentacao = async function() {
-  _origAbrirNovaMov();
-  await _populateMovNovoProdSel();
-};
+        // Preencher Prometheus
+        const promUrl = document.getElementById('cfg-prom-url');
+        const promAtual = document.getElementById('cfg-prom-atual');
+        if (promUrl) promUrl.value = getPromUrl();
+        if (promAtual) promAtual.textContent = getPromUrl() || '(não configurado)';
 
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    checkService(getGrafUrl(), 'graf-badge');
-    checkService(getPromUrl(), 'prom-badge');
-  }, 800);
-  setInterval(() => {
-    checkService(getGrafUrl(), 'graf-badge');
-    checkService(getPromUrl(), 'prom-badge');
-  }, 60000);
-});
-</script>
+        // Limpar status
+        document.getElementById('cfg-res').textContent = '';
+        document.getElementById('cfg-res').className = 'tr-res';
+        document.getElementById('cfg-graf-res').textContent = '';
+        document.getElementById('cfg-graf-res').className = 'tr-res';
+        document.getElementById('cfg-prom-res').textContent = '';
+        document.getElementById('cfg-prom-res').className = 'tr-res';
+
+        // Atualizar status da API Key
+        updateApiKeyStatus();
+      };
+
+      const _origSaveConfig = window.saveConfig || function () { };
+
+      window.saveConfig = function () {
+        const url = document.getElementById('cfg-url').value.trim().replace(/\/$/, '');
+        const apiKey = document.getElementById('cfg-api-key').value.trim();
+        const grafUrl = document.getElementById('cfg-graf-url').value.trim().replace(/\/$/, '');
+        const promUrl = document.getElementById('cfg-prom-url').value.trim().replace(/\/$/, '');
+
+        if (!url) {
+          alert('Informe a URL do backend.');
+          return;
+        }
+
+        // Salvar URL
+        setApiUrl(url);
+
+        // Salvar API Key
+        if (apiKey) {
+          setApiKey(apiKey);
+        } else {
+          setApiKey('');
+        }
+
+        // Salvar Grafana e Prometheus
+        if (grafUrl) setGrafUrl(grafUrl);
+        if (promUrl) setPromUrl(promUrl);
+
+        closeModal('ov-cfg');
+
+        // Mostrar mensagem de sucesso
+        if (typeof Toast !== 'undefined') {
+          Toast.success('Configuração salva! Recarregando a página...');
+        } else {
+          alert('Configuração salva! Recarregando a página...');
+        }
+
+        setTimeout(() => {
+          location.reload();
+        }, 1000);
+      };
+
+      // ──────────────────────────────────────────────────────────────
+      // API KEY UI FUNCTIONS
+      // ──────────────────────────────────────────────────────────────
+      function updateApiKeyStatus() {
+        const statusEl = document.getElementById('cfg-api-key-status');
+        if (!statusEl) return;
+
+        const key = getApiKey();
+        if (key) {
+          const masked = key.substring(0, 6) + '...' + key.substring(key.length - 4);
+          statusEl.textContent = `✅ Configurada: ${masked}`;
+          statusEl.style.color = '#22c55e';
+        } else {
+          statusEl.textContent = '⚠️ Não configurada';
+          statusEl.style.color = '#f59e0b';
+        }
+      }
+
+      window.toggleApiKeyVisibility = function () {
+        const input = document.getElementById('cfg-api-key');
+        if (!input) return;
+
+        if (input.type === 'password') {
+          input.type = 'text';
+          setTimeout(() => {
+            input.type = 'password';
+          }, 3000);
+        } else {
+          input.type = 'password';
+        }
+      };
+
+      window.clearApiKey = function () {
+        if (!confirm('⚠️ Remover API Key configurada?')) return;
+
+        setApiKey('');
+        const input = document.getElementById('cfg-api-key');
+        if (input) input.value = '';
+        updateApiKeyStatus();
+
+        if (typeof Toast !== 'undefined') {
+          Toast.info('API Key removida com sucesso');
+        } else {
+          alert('API Key removida com sucesso');
+        }
+      };
+
+      // ──────────────────────────────────────────────────────────────
+      // POPULAR SELECT DE PRODUTOS (Movimentação)
+      // ──────────────────────────────────────────────────────────────
+      async function populateMovNovoProdSel() {
+        const sel = document.getElementById('mn-mov-psel');
+        if (!sel || sel.dataset.loaded) return;
+
+        try {
+          if (typeof api !== 'function') return;
+          const prods = await api('/api/produtos');
+          sel.innerHTML = '<option value="">Selecione o produto...</option>' +
+            prods.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+          sel.dataset.loaded = '1';
+        } catch (e) {
+          // Silencioso
+        }
+      }
+
+      // Override abrirNovaMovimentacao
+      const _origAbrirNovaMov = window.abrirNovaMovimentacao || function () { };
+
+      window.abrirNovaMovimentacao = async function () {
+        _origAbrirNovaMov();
+        await populateMovNovoProdSel();
+      };
+
+      // ──────────────────────────────────────────────────────────────
+      // BUSCA COM DEBOUNCE
+      // ──────────────────────────────────────────────────────────────
+      let searchTimeout;
+
+      function setupSearch() {
+        const busca = document.getElementById('busca');
+        if (!busca) return;
+
+        busca.addEventListener('input', function () {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            if (typeof loadProd === 'function') {
+              loadProd();
+            }
+          }, 400);
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────
+      // INICIALIZAÇÃO
+      // ──────────────────────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', function () {
+        // Configurar busca
+        setupSearch();
+
+        // Atualizar status da API Key
+        setTimeout(updateApiKeyStatus, 100);
+
+        // Verificar serviços após carregar
+        setTimeout(() => {
+          checkService(getGrafUrl(), 'graf-badge');
+          checkService(getPromUrl(), 'prom-badge');
+        }, 800);
+
+        // Verificar periodicamente
+        setInterval(() => {
+          checkService(getGrafUrl(), 'graf-badge');
+          checkService(getPromUrl(), 'prom-badge');
+        }, 60000);
+      });
+
+    })();
+  </script>
+
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <!-- ESTILOS ADICIONAIS                                                -->
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <style>
+    /* ── Badges ── */
+    .badge-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-graf {
+      color: #fbbf24 !important;
+    }
+
+    .badge-graf.ok {
+      color: #86efac !important;
+    }
+
+    .badge-graf.fail {
+      color: #fca5a5 !important;
+    }
+
+    .badge-graf.busy {
+      color: #fbbf24 !important;
+    }
+
+    .badge-prom {
+      color: #f9a8d4 !important;
+    }
+
+    .badge-prom.ok {
+      color: #86efac !important;
+    }
+
+    .badge-prom.fail {
+      color: #fca5a5 !important;
+    }
+
+    .badge-prom.busy {
+      color: #f9a8d4 !important;
+    }
+
+    #graf-badge,
+    #prom-badge {
+      cursor: pointer;
+    }
+
+    #graf-badge:hover,
+    #prom-badge:hover {
+      background: rgba(255, 255, 255, .3);
+    }
+
+    /* ── Config Modal ── */
+    .cfg-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .cfg-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .cfg-section-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 10px;
+    }
+
+    /* ── API Key Status ── */
+    #cfg-api-key-status {
+      font-size: 12px;
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+
+    #cfg-api-key {
+      font-family: monospace;
+      letter-spacing: 1px;
+    }
+
+    .btn-sm.btn-r {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .btn-sm.btn-r:hover {
+      background: #fee2e2;
+    }
+
+    /* ── Field Error ── */
+    .field-error {
+      color: var(--red);
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .field-error.visible {
+      display: block;
+    }
+
+    .inp.invalid {
+      border-color: var(--red) !important;
+      background-color: var(--red-bg) !important;
+    }
+
+    /* ── Movimentações Cores ── */
+    .pos {
+      color: var(--green, #22c55e);
+    }
+
+    .neg {
+      color: var(--red, #ef4444);
+    }
+
+    /* ── Skip Link ── */
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      background: var(--primary);
+      color: #fff;
+      border-radius: var(--radius);
+      z-index: 999;
+      text-decoration: none;
+    }
+
+    .skip-link:focus {
+      top: var(--space-2);
+    }
+
+    /* ── SR Only ── */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    /* ── Responsividade ── */
+    @media (max-width: 640px) {
+      .badge-group .api-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+      }
+
+      .topbar-brand span:not(.host-info) {
+        display: none;
+      }
+
+      .cfg-section {
+        padding: 10px 12px;
+      }
+    }
+  </style>
+
 </body>
+
 </html>

@@ -1,33 +1,385 @@
-# --- Backups e Arquivos Compactados ---
+# ══════════════════════════════════════════════════════════════════════════════
+# TechStock - .gitignore
+# Versão refatorada com cobertura completa para Node.js + PostgreSQL
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS SENSÍVEIS (NUNCA COMMITAR!)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# Secrets e credenciais
+*.pem
+*.pkcs12
+*.key
+*.crt
+*.csr
+secrets.json
+credentials.json
+*.secret
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPENDÊNCIAS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Python (se usado para scripts)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Java (se usado para ferramentas)
+*.class
+*.jar
+*.war
+*.ear
+target/
+.gradle/
+build/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGS
+# ══════════════════════════════════════════════════════════════════════════════
+
+logs/
+*.log
+log/
+*.log.*
+access.log
+error.log
+combined.log
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS DE BUILD / DIST
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Backend
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Frontend (se houver build separado)
+public/build/
+public/dist/
+static/build/
+static/dist/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BANCO DE DADOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Dumps do banco de dados
+*.sql
+*.dump
+*.backup
+*.pgdump
+backup_*.sql
+dump_*.sql
+
+# Arquivos de migração (se houver)
+migrations/*.sql
+db/migrations/*.sql
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS DE BACKUP
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Backups gerais
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+*.gz
+*.bz2
+
+# Backups específicos do projeto
 backend.tar.gz
 backend_base64.txt
 resumo.txt
+*.bak
+*.old
+*.orig
 
-# --- Sistema Operacional / IDEs ---
+# ══════════════════════════════════════════════════════════════════════════════
+# SISTEMA OPERACIONAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Linux
+*~
+.directory
+*.swp
+*.swo
+*.swn
+*.un~
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IDEs E EDITORES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# VS Code
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.code-workspace
+
+# IntelliJ / WebStorm / PHPStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+.idea/dictionaries/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*.un~
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Notepad++
+nppbackup/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TESTES E COBERTURA
+# ══════════════════════════════════════════════════════════════════════════════
+
+coverage/
+.nyc_output/
+*.lcov
+*.coverage
+test-results/
+junit.xml
+test-report.html
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCUMENTAÇÃO GERADA
+# ══════════════════════════════════════════════════════════════════════════════
+
+docs/_build/
+docs/.build/
+apidoc/
+jsdoc/
+typedoc/
+*.md.html
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCKER
+# ══════════════════════════════════════════════════════════════════════════════
+
+docker-compose.override.yml
+.dockerignore
+Dockerfile.dev
+*.dockerfile
+.docker/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PERFORMANCE E MONITORAMENTO
+# ══════════════════════════════════════════════════════════════════════════════
+
+profile-*.cpuprofile
+heap-*.heapsnapshot
+*.trace
+*.heapprofile
+*.cpuprofile
+v8.log
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS TEMPORÁRIOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+tmp/
+temp/
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS DO SISTEMA
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Debug
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Arquivos de configuração local
+*.local
+*.development
+*.staging
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARQUIVOS DE TERCEIROS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# AWS
+.aws/
+
+# Google Cloud
+.google/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Kubernetes
+*.kubeconfig
+*.kube/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXCEÇÕES (Arquivos que DEVEM ser commitados)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# !.env.example  # Descomente se quiser versionar o .env.example
+!.gitignore
+!.dockerignore
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTA: Se você estiver usando um monorepo, considere adicionar:
+# ══════════════════════════════════════════════════════════════════════════════
+# packages/*/node_modules/
+# packages/*/dist/
+# packages/*/build/
+# packages/*/.env
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TechStock - .gitignore
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Ambiente ──────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Node.js ──────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ── Docker ──────────────────────────────────────────────────────────────────
+*.tar.gz
+*.tgz
+*.zip
+
+# ── Backups ──────────────────────────────────────────────────────────────────
+*.backup
+*.dump
+*.sql
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+log/
+
+# ── Build ────────────────────────────────────────────────────────────────────
+dist/
+build/
+
+# ── Sistema Operacional ──────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# --- Arquivos Sensíveis (Sempre bom prevenir) ---
-.env
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.code-workspace
+
+# ── Arquivos do sistema ─────────────────────────────────────────────────────
+*.pid
+*.seed
+*.pid.lock
+
+# ── Secrets ──────────────────────────────────────────────────────────────────
 *.pem
-*.pkcs12
 *.key
+*.crt
+secrets.json
+credentials.json
+*.secret
 
-# --- Dependências e Builds Comuns (Caso o backend extraído use essas stacks) ---
-# Node.js
-node_modules/
-dist/
+# ── Docker ──────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+.dockerignore
 
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
-env/
-
-# Java / Maven / Gradle
-target/
-.gradle/
-build/
+# ── Backups do projeto ─────────────────────────────────────────────────────
+backend.tar.gz
+backend_base64.txt
+resumo.txt

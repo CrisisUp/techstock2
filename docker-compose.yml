@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: techstock-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: techstock
+      POSTGRES_INITDB_ARGS: "--auth-host=trust"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - techstock-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  techstock:
+    build: .
+    container_name: techstock
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+      - "9091:9090"
+      - "3031:3030"
+      - "9101:9100"
+    volumes:
+      - prometheus-data:/var/lib/prometheus
+      - grafana-data:/var/lib/grafana
+      - ./backend/.env:/app/backend/.env:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=techstock
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_SSL=false
+    restart: unless-stopped
+    networks:
+      - techstock-network
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  techstock-network:
+    driver: bridge
